@@ -1,0 +1,142 @@
+---
+title: "Known Limitations and Edge Cases"
+sidebarTitle: "Limitations"
+description: "Understand the constraints and known edge cases in Logic Assignment: variable limits, large tree behaviour, error handling, and parser assumptions."
+---
+
+Logic Assignment is a focused educational tool, and its source code makes several deliberate simplifications that become important constraints in practice. This page documents every known limitation extracted directly from `Assignment.cpp` — covering variable count ceilings, large-tree suppression thresholds, runtime error conditions, parser behaviour, and architectural constraints. Reading this page before using the tool with complex or large formulas will save debugging time.
+
+---
+
+## Limitations
+
+<Warning>
+  **Operator precedence is positional, not classical.**
+
+  In classical logic, operator precedence is: NOT binds tightest, then AND, then OR, then implication (weakest). Logic Assignment does **not** implement this ordering. The `processInfix` helper selects the **first** binary operator encountered when scanning the token list left-to-right at the current nesting level, regardless of which operator it is.
+
+  This means `A+B*C` is parsed as `(A+B)*C` (OR is the main operator because it appears first), not `A+(B*C)` as classical precedence would dictate.
+
+  **Always use explicit parentheses** to make grouping unambiguous:
+  ```
+  A+(B*C)   -- correct: AND binds tighter
+  (A+B)*C   -- also valid, but different meaning
+  ```
+  Relying on implicit precedence will silently produce the wrong formula with no error or warning.
+</Warning>
+
+---
+
+<Note>
+  **Truth table variable limit: `MAX_TRUTH_TABLE_VARS = 16`.**
+
+  `generateTruthTable()` will not print a truth table for formulas that contain more than 16 distinct propositional variables. When the limit is exceeded, the following message is printed to `stdout` and the method returns early:
+
+  ```
+  Formula has N variables, so its truth table would have 2^N rows.
+  Skipping (limit is 16 variables).
+  ```
+
+  This limit exists because `2^16 = 65,536` rows is the practical ceiling for terminal output; `2^17` (131,072 rows) and beyond would be unusably large. Tree traversal and height computation are unaffected by this limit and will still run normally.
+</Note>
+
+---
+
+<Note>
+  **Large tree traversal suppression: `LARGE_TREE_NODES = 300`.**
+
+  When `countNodes()` returns more than 300, all six traversal methods (`printPreOrderRecursive`, `printPreOrderIterative`, `printInOrderRecursive`, `printInOrderIterative`, `printPostOrderRecursive`, `printPostOrderIterative`) are **skipped** in `main()` and the following message is printed instead:
+
+  ```
+  Tree is large (N nodes). Skipping full traversal display .
+  ```
+
+  This threshold is hard-coded in `main()` — it is not a class-level constant — so calling the traversal methods directly on a large tree (bypassing `main()`) will still execute and print output. Height computation and truth table generation are unaffected and always run regardless of tree size.
+</Note>
+
+---
+
+<Note>
+  **Unbalanced parentheses throw a runtime exception.**
+
+  If `prepare()` detects parentheses that are not properly matched — either a closing `)` with no corresponding opening `(`, or an unclosed `(` at the end of the formula — it throws:
+
+  ```cpp
+  throw runtime_error("unbalanced parentheses in formula");
+  ```
+
+  `main()` catches all `std::exception` subclasses, prints `Error: unbalanced parentheses in formula`, and exits with code `1`. There is no partial-recovery mode; the program terminates entirely.
+</Note>
+
+---
+
+<Note>
+  **Unexpected characters throw a runtime exception.**
+
+  Any character in the input formula that is not a letter (`a-z`, `A-Z`), digit (`0-9`), underscore (`_`), recognised operator (`~`, `+`, `*`, `>`), parenthesis (`(`, `)`), or whitespace will cause `prepare()` to throw:
+
+  ```cpp
+  throw runtime_error("unexpected character 'X' in formula");
+  ```
+
+  Common pitfalls from other logic notations:
+
+  | Wrong character | Intended operator | Correct character |
+  |-----------------|-------------------|-------------------|
+  | `!`             | NOT               | `~`               |
+  | `\|` or `\|\|`  | OR                | `+`               |
+  | `&` or `&&`     | AND               | `*`               |
+  | `->` or `=>`    | Implication       | `>`               |
+  | `-` (alone)     | (none)            | *(not supported)* |
+
+  As with unbalanced parentheses, this exception propagates to `main()` and causes an immediate exit with code `1`.
+</Note>
+
+---
+
+<Note>
+  **Input is interactive (stdin).**
+
+  `main()` reads input using `getline(cin, input_str)`, which blocks waiting for a line from standard input. There is no command-line argument mode. To use Logic Assignment non-interactively (e.g. in a script or pipeline), pipe input through stdin:
+
+  ```bash
+  echo "(A+B)*~C" | ./Assignment
+  ```
+
+  Or use shell redirection with a file whose first line is the formula:
+
+  ```bash
+  ./Assignment < formula.txt
+  ```
+
+  There is no `-e` flag, `--formula` argument, or equivalent programmatic entry point beyond constructing a `PropositionalTree` object directly in code.
+</Note>
+
+---
+
+<Note>
+  **No output format options.**
+
+  All output — traversal results, height values, and truth tables — is written directly to `stdout` using `std::cout`. There is no flag to suppress sections, redirect output to a file, choose between formats (e.g. JSON, CSV), or silence the section headers (`--- Tree Traversals ---`, `--- Tree Height ---`, `--- Truth Table ---`). Capturing specific output requires piping `stdout` and filtering externally (e.g. with `grep`).
+</Note>
+
+---
+
+<Note>
+  **Copy construction is disabled.**
+
+  `PropositionalTree` explicitly deletes both its copy constructor and copy assignment operator:
+
+  ```cpp
+  PropositionalTree(const PropositionalTree&) = delete;
+  PropositionalTree& operator=(const PropositionalTree&) = delete;
+  ```
+
+  This means you cannot copy, clone, or store `PropositionalTree` objects by value in a container. The intended usage pattern (shown in `main()`) is to manage the object through `std::unique_ptr`:
+
+  ```cpp
+  auto tree = std::make_unique<PropositionalTree>("(A+B)*~C");
+  ```
+
+  If you need to "copy" a formula, construct a new `PropositionalTree` from the same string and call the build pipeline again.
+</Note>

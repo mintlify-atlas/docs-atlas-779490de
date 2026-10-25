@@ -1,0 +1,146 @@
+---
+title: "Generating Truth Tables for Propositional Formulas"
+sidebarTitle: "Truth Table"
+description: "Logic Assignment evaluates every combination of truth values for the formula's variables and prints a formatted truth table showing each row's result."
+---
+
+A truth table is the definitive semantic description of a propositional formula: it lists every possible assignment of truth values to the formula's variables and records whether the formula evaluates to true or false under each one. Logic Assignment generates this table automatically after building the expression tree, walking the tree once per assignment to compute the result and printing each row in a clean, aligned format — no external solver or SAT library required.
+
+## How `generateTruthTable()` works
+
+The method follows four steps:
+
+### 1. Collect unique variables
+
+`populateVars(root, unique_vars)` performs a recursive tree walk, inserting the integer ID of every **leaf node** into a `set<int>`. Because `std::set` automatically deduplicates, each variable appears at most once regardless of how many times it occurs in the formula.
+
+### 2. Sort alphabetically
+
+The collected IDs are copied into a `vector<int>` and sorted by variable name:
+
+```cpp
+std::sort(vars.begin(), vars.end(), [&](int a, int b) {
+    return names[a] < names[b];
+});
+```
+
+This guarantees that the column order in the header and in every data row is **alphabetical by variable name**, giving deterministic, reproducible output independent of the order in which variables were first encountered during parsing.
+
+### 3. Enumerate all 2ⁿ assignments
+
+For `n` variables, the outer loop iterates from `i = 0` to `2ⁿ - 1`. Row `i` is treated as an `n`-bit binary number: the value assigned to variable `j` (0-indexed, left to right) is extracted with:
+
+```cpp
+bool val = (i >> (n - 1 - j)) & 1;
+```
+
+The **leftmost variable is the most significant bit**, so the first variable cycles slowest and the last variable cycles fastest — exactly the conventional truth-table ordering (TTTT…FF, TFTF…, etc.).
+
+### 4. Evaluate the tree
+
+`evaluateRec(root, truthValues)` recursively evaluates the expression tree given the current assignment stored in `truthValues`:
+
+```cpp
+bool evaluateRec(Node* curr, const vector<char>& truthValues) {
+    if (!(curr->left || curr->right))
+        return truthValues[curr->data];          // leaf: look up assigned value
+
+    if (curr->data == OP_NOT)
+        return !evaluateRec(curr->left, truthValues);
+
+    bool left_val  = evaluateRec(curr->left,  truthValues);
+    bool right_val = evaluateRec(curr->right, truthValues);
+
+    if (curr->data == OP_OR)  return left_val || right_val;
+    if (curr->data == OP_AND) return left_val && right_val;
+    if (curr->data == OP_IMP) return (!left_val) || right_val;
+
+    return false;
+}
+```
+
+**Operator semantics:**
+
+| Operator | Symbol | Logic |
+|---|---|---|
+| NOT | `~` | `!left` |
+| OR | `+` | `left \|\| right` |
+| AND | `*` | `left && right` |
+| Implication | `>` | `!left \|\| right` |
+
+Implication uses the standard **material implication** definition: `A > B` is false only when `A` is true and `B` is false.
+
+---
+
+## Output format
+
+Each variable gets its own column, followed by a `Result` column. Values are printed as `T` (true) or `F` (false). A separator line of dashes is drawn under the header with a length that matches the full header string, keeping the table visually aligned.
+
+<Note>
+For variables with **multi-character names**, the column header and data cells are padded with trailing spaces to maintain alignment. A variable named `p1` occupies the same column width as the header `p1`, so the `|` separators remain vertically aligned across all rows.
+</Note>
+
+---
+
+## Examples
+
+### Simple implication — `A > B`
+
+```
+--- Truth Table ---
+A | B | Result
+---------------
+F | F |   T
+F | T |   T
+T | F |   F
+T | T |   T
+```
+
+`A > B` is false only in row 3, where `A` is true and `B` is false — confirming the material implication semantics.
+
+---
+
+### Unary negation — `~A`
+
+```
+--- Truth Table ---
+A | Result
+----------
+F |   T
+T |   F
+```
+
+With a single variable, only two rows are generated (2¹ = 2). NOT simply flips the truth value of its operand.
+
+---
+
+## Variable limit
+
+<Warning>
+`generateTruthTable()` enforces a hard limit of **`MAX_TRUTH_TABLE_VARS = 16`** variables. Formulas with more than 16 distinct variables would require 2¹⁶ = 65 536 rows or more. When this limit is exceeded, the table is skipped and the following message is printed instead:
+
+```
+Formula has N variables, so its truth table would have 2^N rows.
+Skipping (limit is 16 variables).
+```
+
+To analyse larger formulas, consider breaking the formula into smaller sub-expressions or using a dedicated SAT solver.
+</Warning>
+
+---
+
+## Summary of the column layout
+
+```
+<var_1> | <var_2> | ... | <var_n> | Result
+------------------------------------------
+  F     |   F     | ... |   F     |   T
+  F     |   F     | ... |   T     |   F
+  ...
+  T     |   T     | ... |   T     |   T
+```
+
+- Variables appear left to right in **alphabetical order**.
+- Row 0 has all variables set to `F` (all bits zero).
+- The most significant bit corresponds to the leftmost (first alphabetical) variable, so it toggles least frequently.
+- The `Result` column always appears last and is padded with two leading spaces (`"  T"` / `"  F"`) for readability.

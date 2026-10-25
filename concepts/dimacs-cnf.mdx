@@ -1,0 +1,121 @@
+---
+title: "Loading Formulas from DIMACS CNF Files"
+sidebarTitle: "DIMACS CNF"
+description: "Load propositional formulas in standard DIMACS CNF format into Logic Assignment instead of typing them manually as infix strings."
+---
+
+Logic Assignment does not require you to hand-write an infix formula. As an alternative input path, the program can read a file in **DIMACS CNF format** — the plain-text standard used by virtually every SAT solver and benchmark library — and automatically convert it into the internal infix representation before building the expression tree. This makes it straightforward to explore real-world SAT instances without transcribing them by hand.
+
+## What Is DIMACS CNF?
+
+DIMACS CNF is a text-based format for encoding propositional logic problems in **Conjunctive Normal Form (CNF)**: a conjunction (AND) of one or more clauses, where each clause is a disjunction (OR) of literals, and each literal is either a propositional variable or its negation. The format was popularised by the DIMACS (Center for Discrete Mathematics and Theoretical Computer Science) challenge problems and remains the universal interchange format for SAT solvers today.
+
+## File Format
+
+A DIMACS CNF file is a plain-text file. The `parseCNF` method processes it line by line according to the following rules:
+
+| Line type                              | How it is handled                        |
+|----------------------------------------|------------------------------------------|
+| Starts with `c`                        | Comment — skipped entirely               |
+| Starts with `p`                        | Problem header — skipped entirely        |
+| Starts with `%`                        | End-of-file marker — skipped entirely    |
+| Any other non-empty line               | Parsed as a sequence of literal integers |
+
+Each non-skipped line contains one or more integers separated by whitespace:
+
+- A **positive integer** `n` represents the positive literal of variable `n`.
+- A **negative integer** `-n` represents the negated literal of variable `n` (i.e. `~Vn`).
+- The integer **`0`** terminates the current clause. Any literals read since the last `0` (or since the start of parsing) form one clause.
+
+### Variable Naming
+
+After all clauses are collected, the parser determines `maxVar` — the largest absolute literal value seen. Variable names are then assigned as follows:
+
+- If `maxVar ≤ 26`: variable `n` is named with the single uppercase letter at position `n − 1` in the alphabet, so variable `1` → `A`, variable `2` → `B`, …, variable `26` → `Z`.
+- If `maxVar > 26`: variable `n` is named `x1`, `x2`, …, `xN`.
+
+### Sample `.cnf` File
+
+```text
+c Example CNF
+p cnf 3 2
+1 -2 0
+-1 3 0
+```
+
+This file describes a formula over 3 variables with 2 clauses:
+
+- Clause 1: variable 1 OR (NOT variable 2) → `A + ~B`
+- Clause 2: (NOT variable 1) OR variable 3 → `~A + C`
+
+The full formula is the conjunction of both clauses: `(A + ~B) * (~A + C)`.
+
+## How `parseCNF` Builds the Infix String
+
+`parseCNF` translates the collected clauses into a nested infix string using two layers of parenthesisation:
+
+1. **Inside each clause**, literals are folded left-to-right with `+` (OR):
+
+   ```
+   first literal:          atom
+   second literal onward:  (prev_clause + atom)
+   ```
+
+   So a clause `[1, -2, 3]` (with `maxVar ≤ 26`) becomes:
+   ```
+   A          ← literal 1
+   (A+~B)     ← add literal -2
+   ((A+~B)+C) ← add literal 3
+   ```
+
+2. **Across clauses**, clauses are folded left-to-right with `*` (AND):
+
+   ```
+   first clause:           clause_str
+   second clause onward:   (prev_formula * clause_str)
+   ```
+
+   So two clauses `C1` and `C2` produce `(C1*C2)`; three clauses `C1`, `C2`, `C3` produce `((C1*C2)*C3)`.
+
+Applying this to the sample file above:
+
+```
+Clause 1:  (A+~B)
+Clause 2:  (~A+C)
+Formula:   ((A+~B)*(~A+C))
+```
+
+This string is then passed to `prepare()` exactly as if the user had typed it at the prompt.
+
+## Behaviour After Parsing
+
+Once `parseCNF` returns the infix string, the program follows **exactly the same path** as the manual-entry method: `prepare()` lexes the string into `infixTokens`, `infixToPrefix()` converts it to prefix order, and `buildTreeFromPrefix()` constructs the expression tree. All downstream features — tree traversals, height computation, and truth-table generation — are available without any further configuration.
+
+## Runtime Usage
+
+Run the compiled program, press **Enter** at the Method 1 prompt to skip manual formula entry, then supply the path to your `.cnf` file at the Method 2 prompt:
+
+```bash
+./logic
+```
+
+```
+METHOD 1: Enter an infix formula (or press ENTER to skip): ↵
+METHOD 2: Enter the path to the DIMACS .cnf file: /path/to/problem.cnf
+```
+
+The program strips leading/trailing whitespace and quotation marks from the path automatically, so paths copied from a file manager (which may include surrounding quotes) are handled correctly.
+
+<Tip>
+  Many publicly available SAT benchmark collections — including [SATLIB](https://www.cs.ubc.ca/~hoos/SATLIB/benchm.html) and the original DIMACS challenge instances — distribute their problems as `.cnf` files that conform exactly to this format and are directly loadable by Logic Assignment without any preprocessing.
+</Tip>
+
+<Warning>
+  The file is opened with a standard `ifstream`. If the path cannot be opened — because the file does not exist, the path is misspelled, or permissions are insufficient — the program prints an error message and exits with a non-zero status code:
+
+  ```
+  Error: Could not open file.
+  ```
+
+  Double-check the path and ensure you have read permission on the file before retrying.
+</Warning>

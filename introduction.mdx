@@ -1,0 +1,84 @@
+---
+title: "Logic Assignment: Propositional Logic Trees in C++"
+sidebarTitle: "Introduction"
+description: "Logic Assignment parses propositional logic formulas into binary expression trees and supports traversals, height computation, and truth table generation."
+---
+
+**Logic Assignment** is a C++ program that transforms a propositional logic formula into a binary expression tree and then exercises that tree with a full suite of algorithms — recursive and iterative pre-, in-, and post-order traversals, two independent height computations, and a complete truth table. You supply the formula either by typing it directly in infix notation or by pointing the program at a DIMACS CNF file; in both cases the same tree-building and analysis pipeline runs automatically.
+
+## What the Program Does
+
+The program follows a four-stage pipeline every time it runs:
+
+1. **Parse** — the input formula (or CNF file) is tokenised and converted into a prefix token stream.
+2. **Build** — a binary `Node`-based expression tree is constructed recursively from that prefix stream.
+3. **Traverse** — the tree is printed in pre-order, in-order, and post-order using both a recursive and an iterative implementation for each traversal.
+4. **Analyse** — the recursive and iterative tree heights are printed, followed by a truth table that exhaustively evaluates the formula for every possible assignment of its variables.
+
+## Input Modes
+
+The program reads from standard input interactively and offers two mutually-exclusive input modes at startup.
+
+<CardGroup cols={2}>
+  <Card title="Infix Formula" icon="keyboard">
+    Type a propositional formula in standard infix notation — e.g. `(A+B)*~C` — directly at the prompt. Parentheses are used for grouping; spaces are optional.
+  </Card>
+  <Card title="DIMACS CNF File" icon="file">
+    Press **Enter** at the first prompt to skip infix mode, then provide the path to a `.cnf` file in DIMACS format. The program parses each clause and reconstructs an equivalent infix formula before building the tree.
+  </Card>
+</CardGroup>
+
+## Supported Operators
+
+All propositional connectives are single-character symbols. Variable names may be any alphanumeric identifier (letters, digits, underscores).
+
+| Symbol | Operator | Arity |
+|--------|----------|-------|
+| `~` | Negation (NOT) | Unary (prefix) |
+| `+` | Disjunction (OR) | Binary |
+| `*` | Conjunction (AND) | Binary |
+| `>` | Implication | Binary |
+
+Operator precedence is enforced solely through parentheses — the parser identifies the leftmost binary operator at each nesting level as the root of a sub-tree, so explicit grouping is required for unambiguous formulas.
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Tree Traversals" icon="arrow-right-arrow-left">
+    Pre-order, in-order, and post-order traversals are each implemented **twice** — once recursively and once iteratively — so that both outputs can be compared side-by-side.
+  </Card>
+  <Card title="Tree Height" icon="ruler-vertical">
+    Tree height is computed with a depth-first recursive method and independently with a breadth-first (level-order) iterative method, both printed for verification.
+  </Card>
+  <Card title="Truth Table" icon="table">
+    Variables are collected from the tree, sorted alphabetically, and every Boolean assignment is evaluated. Results are printed with `T`/`F` columns for each variable and the formula's result.
+  </Card>
+  <Card title="DIMACS CNF Import" icon="file-import">
+    Clauses from a DIMACS `.cnf` file are parsed and composed into a single AND-of-OR infix formula, which then flows through the same parsing and tree-building pipeline.
+  </Card>
+</CardGroup>
+
+<Note>
+  The truth table generator supports formulas with **up to 16 variables** (`MAX_TRUTH_TABLE_VARS = 16`). A formula with more than 16 distinct variables will cause the truth table to be skipped — the program prints a message explaining the row count that would be required (2ⁿ rows) and exits that section cleanly. Traversal and height output are still produced normally.
+</Note>
+
+<Note>
+  For very large trees the traversal output is suppressed. When the node count exceeds **300** (`LARGE_TREE_NODES = 300`), the program prints the node count and a notice that the full traversal display has been skipped. Tree height and truth table computation still proceed as normal.
+</Note>
+
+## Explore the Documentation
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="quickstart">
+    Compile the program, run it with a formula or CNF file, and read your first traversal and truth table output in under five minutes.
+  </Card>
+  <Card title="Formula Syntax" icon="code" href="concepts/formula-syntax">
+    Detailed reference for the infix formula language: operator symbols, variable naming rules, parenthesisation, and common mistakes.
+  </Card>
+  <Card title="Expression Tree" icon="diagram-project" href="concepts/expression-tree">
+    How the program converts an infix string to a prefix token stream and then builds the binary expression tree node by node.
+  </Card>
+  <Card title="DIMACS CNF Format" icon="file-lines" href="concepts/dimacs-cnf">
+    What a DIMACS `.cnf` file looks like, which lines the parser reads and which it skips, and how clauses are assembled into a single infix formula.
+  </Card>
+</CardGroup>

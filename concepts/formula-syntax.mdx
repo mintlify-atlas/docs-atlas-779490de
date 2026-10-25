@@ -1,0 +1,126 @@
+---
+title: "Propositional Formula Syntax and Operator Rules"
+sidebarTitle: "Formula Syntax"
+description: "Learn the operator symbols, precedence rules, and parenthesisation conventions used by Logic Assignment to parse propositional logic formulas."
+---
+
+Logic Assignment accepts propositional logic formulas as plain-text infix strings, using a compact set of single-character operator symbols. Before any tree is built, the lexer scans the string character by character, classifies every token, and hands a flat token list to the recursive parser — so understanding the exact symbols, variable-naming rules, and parenthesisation conventions is the first step to writing formulas the program will accept without error.
+
+## Operator Symbols
+
+The four logical connectives are encoded as single-character symbols. Each maps to a negative integer constant inside the `PropositionalTree` class, which lets the implementation distinguish operators from non-negative variable IDs at a glance.
+
+| Symbol | Operator    | Arity  | Internal constant | Example      |
+|--------|-------------|--------|-------------------|--------------|
+| `~`    | NOT         | Unary  | `OP_NOT = -1`     | `~A`         |
+| `+`    | OR          | Binary | `OP_OR  = -2`     | `A + B`      |
+| `*`    | AND         | Binary | `OP_AND = -3`     | `A * B`      |
+| `>`    | Implication | Binary | `OP_IMP = -4`     | `A > B`      |
+
+Parentheses `(` and `)` are also recognised tokens (mapped to `LPAREN = -10` and `RPAREN = -11` internally) and are used to group sub-expressions.
+
+## Variable Names
+
+A variable name is any non-empty sequence of alphanumeric characters (`a`–`z`, `A`–`Z`, `0`–`9`) and underscores (`_`). The lexer greedily consumes characters matching `isalnum || '_'`, so multi-character names like `p1`, `rain`, or `var_x` are all valid. Each unique name is assigned a non-negative integer ID and stored in the `names` vector; the same name used more than once in a formula always maps to the same ID.
+
+```text
+A          ← single uppercase letter
+p1         ← alphanumeric multi-character name
+rain       ← alphabetic multi-character name
+var_x      ← name containing an underscore
+```
+
+## Whitespace
+
+The lexer skips all whitespace characters unconditionally. You may add spaces freely around operators and operands to improve readability — the resulting token sequence is identical either way.
+
+```text
+A+B      ← valid
+A + B    ← identical token sequence
+A  +  B  ← also identical
+```
+
+## Operator Precedence and Parenthesisation
+
+Precedence is **not** encoded as a fixed table of priorities. Instead, the recursive `processInfix()` function finds the **first binary operator at the top level** of the current token window (skipping over any parenthesised sub-expressions) and treats it as the main connective. This is a strict left-to-right scan, so the leftmost top-level binary operator always wins.
+
+Because the parser does not apply conventional precedence rules (e.g. AND binding more tightly than OR), **explicit parentheses are strongly recommended** whenever a formula mixes operators. For example, `A + B * C` is parsed as `(A + B) * C` — the `+` is the first binary operator encountered at the top level — which may not be the intended reading.
+
+Use parentheses to make the intended structure unambiguous:
+
+```text
+(A + B) * C    ← OR applied first, then AND
+A + (B * C)    ← AND applied first, then OR
+```
+
+### How the Parser Strips Outer Parentheses
+
+If the **entire** expression passed to `processInfix()` is wrapped in a matching pair of outermost parentheses — that is, `infixTokens[l]` is `(` and its matching `)` is at position `r-1` — the parser strips that outer pair before proceeding. This stripping repeats in a `while` loop, so multiple redundant layers are all removed before the main operator is located.
+
+```text
+((A + B))   →  stripped to  →  A + B   →  main op is +
+```
+
+## Formula Examples
+
+**Disjunction (OR)**
+
+```text
+A + B
+```
+
+**Conjunction (AND)**
+
+```text
+A * B
+```
+
+**Negation (NOT)**
+
+```text
+~A
+```
+
+**Implication**
+
+```text
+A > B
+```
+
+**Compound formula mixing AND, OR, and NOT**
+
+```text
+(A + B) * ~C
+```
+
+The outer `*` is the main connective. Its left sub-tree encodes `A + B`; its right sub-tree is the negation `~C`.
+
+**Multi-character variable names**
+
+```text
+(p1 + p2) > (q * ~r)
+```
+
+Variable names `p1`, `p2`, `q`, and `r` are each lexed as a single token. The main connective is `>`, with `(p1 + p2)` on the left and `(q * ~r)` on the right.
+
+## Error Conditions
+
+<Warning>
+  **Unbalanced parentheses** cause the program to throw a runtime error immediately during the lexing phase and abort:
+
+  ```
+  runtime_error: unbalanced parentheses in formula
+  ```
+
+  This is raised both when a closing `)` is encountered with no matching `(` on the stack, and when the stack is non-empty after all tokens have been processed (i.e. one or more `(` were never closed).
+</Warning>
+
+<Warning>
+  **Unexpected characters** — any character that is not whitespace, a recognised operator symbol, a parenthesis, or an alphanumeric/underscore character — cause the program to throw a runtime error identifying the offending character:
+
+  ```
+  runtime_error: unexpected character '<char>' in formula
+  ```
+
+  Common mistakes include using `&` or `|` instead of `*` and `+`, or pasting a formula that contains Unicode quotation marks.
+</Warning>

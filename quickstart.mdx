@@ -1,47 +1,154 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with Logic Assignment"
+sidebarTitle: "Quickstart"
+description: "Compile the C++ source, run the program with an infix formula or a DIMACS CNF file, and read traversal and truth table output in under five minutes."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+**Logic Assignment** ships as a single self-contained C++ source file — there are no external dependencies and no build system required. You compile it once with any C++17-capable compiler, then run the resulting binary interactively to parse a propositional formula or a DIMACS CNF file and immediately see traversal output, tree height, and a truth table.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+<Note>
+  The program reads all input from **standard input (stdin) interactively**. When you launch the binary you will be prompted first for an infix formula and, if you skip that, for a CNF file path. There are no command-line flags or configuration files.
+</Note>
 
 ## Prerequisites
 
-Before you begin, you must have:
+- A C++17-capable compiler — **g++ 7+** or **clang++ 5+** both work.
+- A terminal / shell to compile and run the binary.
+- (Optional for Method 2) A DIMACS `.cnf` file to test CNF import.
 
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+## Steps
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Download the source file">
+    Clone the repository or copy `Assignment.cpp` into a working directory.
 
     ```bash
-    npm install your-package
+    git clone https://github.com/gnanadeep-sai/logic-assignment.git
+    cd logic-assignment
+    ```
+
+    Confirm the source file is present:
+
+    ```bash
+    ls Assignment.cpp
     ```
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Compile">
+    Compile `Assignment.cpp` with C++17 support and basic optimisation:
 
     ```bash
-    your-cli init
+    g++ -std=c++17 -O2 -o logic Assignment.cpp
+    ```
+
+    If you prefer clang++:
+
+    ```bash
+    clang++ -std=c++17 -O2 -o logic Assignment.cpp
+    ```
+
+    A successful compile produces no output and leaves a `logic` binary in the current directory.
+  </Step>
+
+  <Step title="Run — Method 1: infix formula">
+    Launch the binary and type a propositional formula at the first prompt.
+
+    ```bash
+    ./logic
+    ```
+
+    The program will display:
+
+    ```text
+    METHOD 1: Enter an infix formula (or press ENTER to skip):
+    ```
+
+    Type your formula and press Enter:
+
+    ```text
+    (A+B)*~C
+    ```
+
+    The program immediately parses the formula, builds the expression tree, and prints traversals, height, and the truth table:
+
+    ```text
+    --- Tree Traversals ---
+    Nodes in tree          : 5
+
+    Pre-Order (Recursive) : * + A B ~ C
+    Pre-Order (Iterative) : * + A B ~ C
+    In-Order (Recursive)  : ((A + B) * (~C))
+    In-Order (Iterative)  : ((A + B) * (~C))
+    Post-Order (Recursive): A B + C ~ *
+    Post-Order (Iterative): A B + C ~ *
+
+    --- Tree Height ---
+    Height (Recursive)     : 3
+    Height (Iterative)     : 3
+
+    --- Truth Table ---
+    A | B | C | Result
+    -------------------
+    F | F | F |   F
+    F | F | T |   F
+    F | T | F |   T
+    F | T | T |   F
+    T | F | F |   T
+    T | F | T |   F
+    T | T | F |   T
+    T | T | T |   F
     ```
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Run — Method 2: DIMACS CNF file">
+    Launch the binary, press **Enter** at the first prompt to skip infix mode, then provide the path to a `.cnf` file.
 
     ```bash
-    your-cli start
+    ./logic
     ```
+
+    ```text
+    METHOD 1: Enter an infix formula (or press ENTER to skip):
+    [press Enter]
+    METHOD 2: Enter the path to the DIMACS .cnf file:
+    example.cnf
+    ```
+
+    The program opens the file, parses every clause, assembles an equivalent infix formula (AND of ORs), and runs the same pipeline. Variables are named `A`–`Z` for files with up to 26 variables, or `x1`, `x2`, … for larger instances.
+
+    A minimal `example.cnf` looks like this:
+
+    ```text
+    c Example CNF — two clauses, three variables
+    p cnf 3 2
+    1 -2 0
+    -1 3 0
+    ```
+
+    Which the program translates internally to `((A+~B)*(~A+C))` before building the tree.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Reading the Output
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+| Section | What it shows |
+|---------|--------------|
+| **Nodes in tree** | Total node count after the tree is built. |
+| **Pre-Order** | Root → left → right (prefix notation, space-separated). |
+| **In-Order** | Fully parenthesised infix expression. |
+| **Post-Order** | Left → right → root (postfix / RPN notation). |
+| **Height** | Longest root-to-leaf path measured in edges + 1 (node count). |
+| **Truth Table** | One row per variable assignment; columns for each variable then `Result`. |
+
+<Tip>
+  Variable names can be **multi-character** identifiers such as `p1`, `foo`, or `input_A` — any sequence of letters, digits, and underscores works. When at least one multi-character variable is present the program automatically inserts a space separator between tokens in prefix and postfix output so the identifiers remain unambiguous. Single-character variable formulas like `(A+B)*~C` omit the separating spaces in prefix/postfix lines.
 </Tip>
+
+## Common Errors
+
+| Message | Cause | Fix |
+|---------|-------|-----|
+| `unexpected character '...' in formula` | A character outside `~`, `+`, `*`, `>`, `(`, `)`, alphanumerics, `_` was typed. | Remove the unsupported character. |
+| `unbalanced parentheses in formula` | A `(` or `)` is missing. | Check your parentheses pairs. |
+| `Error: Could not open file.` | The CNF file path is wrong or the file does not exist. | Verify the path and that the file is readable. |
+| `Formula has N variables … Skipping` | The formula uses more than 16 variables. | The truth table is skipped automatically; traversals and height still print. |

@@ -1,0 +1,122 @@
+---
+title: "Binary Expression Tree: Structure and Construction"
+sidebarTitle: "Expression Tree"
+description: "Understand how Logic Assignment represents a propositional formula as a binary tree, with operators at internal nodes and variables at leaves."
+---
+
+At the heart of Logic Assignment is a binary expression tree — a recursive data structure where every logical connective becomes an internal node branching over its operands, and every propositional variable becomes a leaf. By reducing a flat infix string to this tree, the program can perform tree traversals, compute height, and evaluate truth tables through simple recursive (and iterative) walks, without re-parsing the formula each time.
+
+## The `Node` Struct
+
+Each node in the tree is a heap-allocated instance of the following struct:
+
+```cpp
+struct Node {
+    int data;
+    Node* left  = nullptr;
+    Node* right = nullptr;
+
+    explicit Node(int val) : data(val) {}
+};
+```
+
+The `data` field carries the node's meaning:
+
+| `data` value          | Meaning                                                      |
+|-----------------------|--------------------------------------------------------------|
+| `OP_NOT  = -1`        | NOT operator (unary)                                         |
+| `OP_OR   = -2`        | OR operator (binary)                                         |
+| `OP_AND  = -3`        | AND operator (binary)                                        |
+| `OP_IMP  = -4`        | Implication operator (binary)                                |
+| `>= 0` (non-negative) | Variable ID — index into the `names` vector for its string label |
+
+The sign of `data` is therefore the cheapest way to distinguish operators from variables at runtime: any negative value that is not `LPAREN` (`-10`) or `RPAREN` (`-11`) is an operator.
+
+## Internal Nodes vs. Leaf Nodes
+
+**Internal nodes** (operators) always have at least one child:
+
+- **NOT** (`OP_NOT = -1`) is the only **unary** operator. It stores its single operand in the **left** child; the `right` pointer is always `nullptr`.
+- **OR**, **AND**, and **Implication** are **binary** operators. They store their left operand in `left` and their right operand in `right`; both pointers are non-null for a well-formed formula.
+
+**Leaf nodes** (variables) have both `left` and `right` set to `nullptr`. Their `data` field is a non-negative integer that indexes into the `names` vector, which maps IDs back to the original string names encountered during lexing.
+
+## Tree Construction Pipeline
+
+Building the tree is a three-stage pipeline:
+
+### Stage 1 — Lexing
+
+`prepare()` scans the infix formula string character by character and fills the `infixTokens` vector with integer tokens. Whitespace is discarded, operator characters are mapped to their negative constants, and contiguous alphanumeric/underscore runs become non-negative variable IDs (new names are appended to the `names` vector on first encounter). `matchParen` is also populated here, recording the index of the matching bracket for every `(` and `)` token.
+
+### Stage 2 — Infix to Prefix Conversion
+
+`infixToPrefix()` calls `processInfix(0, infixTokens.size())`, which recursively converts the token window to prefix order and appends results to the `prefix` vector:
+
+1. Strip any outermost matching parentheses from the current window.
+2. If the window is a single token, emit it directly (base case).
+3. Otherwise, scan left-to-right for the first binary operator **not** inside a parenthesised sub-expression (skipping over parenthesised groups using `matchParen`). That operator is the **main connective**.
+4. Emit the main connective, recurse on the left sub-window, then recurse on the right sub-window.
+5. If no binary operator is found, the window must start with `~`; emit `OP_NOT` and recurse on the remainder.
+
+### Stage 3 — Building the Tree from Prefix
+
+`buildTreeFromPrefix()` calls `buildTree(prefix, i)`, which consumes the `prefix` vector left-to-right with a running index `i`:
+
+1. Read `prefix[i]` and advance `i`.
+2. Allocate a new `Node` with that value.
+3. If the value is `OP_NOT`, recursively build one subtree and assign it to `left`.
+4. If the value is any other operator, recursively build two subtrees and assign them to `left` and `right`.
+5. If the value is a variable ID (non-negative), return the leaf immediately.
+
+## ASCII Diagram: `(A+B)*~C`
+
+```
+         *          ← AND (binary): left = (+), right = (~)
+        / \
+       +   ~        ← OR (binary): left = A, right = B
+      / \  |          ~ (unary): left child only = C
+     A   B  C
+```
+
+Note that `~` has **only a left child** (`C`). The right pointer of the `~` node is `nullptr`. This is correct and intentional — NOT is unary.
+
+For comparison, here is an annotated node-by-node layout:
+
+```
+Node  data     left        right
+----  ------   ---------   ---------
+n1    OP_AND   → n2 (+)    → n3 (~)
+n2    OP_OR    → n4 (A)    → n5 (B)
+n3    OP_NOT   → n6 (C)    nullptr
+n4    id(A)    nullptr     nullptr
+n5    id(B)    nullptr     nullptr
+n6    id(C)    nullptr     nullptr
+```
+
+## Large-Tree Output Suppression
+
+After the tree is built, `main()` counts the total number of nodes with `countNodes()` and stores the result in `nodeCount`. If `nodeCount` exceeds the constant `LARGE_TREE_NODES = 300`, all traversal output (pre-order, in-order, post-order — both recursive and iterative variants) is skipped and replaced with a single informational message:
+
+```
+Tree is large (N nodes). Skipping full traversal display.
+```
+
+Height computation and the truth table are **not** suppressed — only the traversal printout is omitted to avoid flooding the terminal with thousands of tokens.
+
+## Memory Management
+
+<Note>
+  The tree is entirely heap-allocated — every `Node` is created with `new` inside `buildTree()`. Cleanup is handled by the `destroyTree()` private method, which performs a **post-order delete walk**:
+
+  ```cpp
+  void destroyTree(Node* curr) {
+      if (!curr) return;
+      destroyTree(curr->left);
+      destroyTree(curr->right);
+      delete curr;
+  }
+  ```
+
+  `destroyTree` is called both in the class destructor (`~PropositionalTree()`) and at the start of `buildTreeFromPrefix()` to free any previously built tree before constructing a new one. Post-order traversal ensures that children are always freed before their parent, preventing dangling-pointer access during deletion.
+</Note>

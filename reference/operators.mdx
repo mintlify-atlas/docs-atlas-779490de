@@ -1,0 +1,155 @@
+---
+title: "Operator Reference: Symbols, Semantics, and Truth Tables"
+sidebarTitle: "Operators"
+description: "Reference for all four propositional operators supported by Logic Assignment: NOT, OR, AND, and implication — with symbols, semantics, and truth tables."
+---
+
+Logic Assignment supports exactly four propositional connectives. Each operator maps to a negative integer sentinel constant stored in tree nodes, is recognised by the tokeniser in `prepare()`, and is rendered back to a character via the private `opChar()` function. Understanding each operator's symbol, arity, evaluation rule, and truth table is essential for writing formulas that behave as intended — especially given that the parser does **not** enforce classical precedence (see [Limitations](/reference/limitations)).
+
+---
+
+## Summary
+
+| Symbol | Name        | Arity  | Returns `false` when…                     |
+|--------|-------------|--------|-------------------------------------------|
+| `~`    | NOT         | Unary  | Its operand is `false`                    |
+| `+`    | OR          | Binary | Both operands are `false`                 |
+| `*`    | AND         | Binary | Either operand is `false`                 |
+| `>`    | Implication | Binary | Left is `true` **and** right is `false`   |
+
+---
+
+## Parentheses (Grouping Tokens)
+
+Parentheses `(` and `)` are not operators — they are **grouping tokens** consumed entirely during parsing and never stored in the expression tree. They are represented internally as `LPAREN = -10` and `RPAREN = -11` solely to build the `matchParen` index during `prepare()`. Once `infixToPrefix()` has run, no `LPAREN` or `RPAREN` token will appear in the `prefix` vector or in any tree node.
+
+Use parentheses liberally to make operator grouping explicit, since the parser does not enforce classical precedence order.
+
+---
+
+## Operators
+
+<AccordionGroup>
+  <Accordion title="NOT  (~)  —  Negation">
+    **Source constant:** `OP_NOT = -1`
+
+    **Symbol:** `~`  (tilde, ASCII 126)
+
+    **Arity:** Unary — prefix operator, takes exactly one operand to its right.
+
+    **Semantics:** Returns the logical complement of its operand. If the operand evaluates to `true`, NOT returns `false`, and vice versa.
+
+    **Evaluation (from source):**
+    ```cpp
+    return !evaluateRec(curr->left, truthValues);
+    ```
+
+    NOT nodes store only a **left child** in the tree; `right` is always `nullptr`. The `buildTree` private helper explicitly handles `OP_NOT` by recursing for only one child.
+
+    **Truth Table:**
+
+    | Operand | Result |
+    |---------|--------|
+    | F       | T      |
+    | T       | F      |
+
+    **Example usage:** `~A`, `~(A*B)`, `~~A` (double negation — valid, evaluates to `A`)
+  </Accordion>
+
+  <Accordion title="OR  (+)  —  Disjunction">
+    **Source constant:** `OP_OR = -2`
+
+    **Symbol:** `+`  (plus, ASCII 43)
+
+    **Arity:** Binary — infix operator, takes one operand on each side.
+
+    **Semantics:** Returns `true` if **at least one** of its two operands is `true` (inclusive OR). Returns `false` only when both operands are `false`.
+
+    **Evaluation (from source):**
+    ```cpp
+    if (curr->data == OP_OR) return left_val || right_val;
+    ```
+
+    **Truth Table:**
+
+    | Left | Right | Result |
+    |------|-------|--------|
+    | F    | F     | F      |
+    | F    | T     | T      |
+    | T    | F     | T      |
+    | T    | T     | T      |
+
+    **Example usage:** `A+B`, `(A+B)+C`
+
+    <Note>
+      Use `+` for OR — **not** `|` or `||`. Those characters are not in the
+      recognised character set and will cause `prepare()` to throw
+      `runtime_error("unexpected character '|' in formula")`.
+    </Note>
+  </Accordion>
+
+  <Accordion title="AND  (*)  —  Conjunction">
+    **Source constant:** `OP_AND = -3`
+
+    **Symbol:** `*`  (asterisk, ASCII 42)
+
+    **Arity:** Binary — infix operator, takes one operand on each side.
+
+    **Semantics:** Returns `true` only when **both** operands are `true`. Returns `false` if either operand is `false`.
+
+    **Evaluation (from source):**
+    ```cpp
+    if (curr->data == OP_AND) return left_val && right_val;
+    ```
+
+    **Truth Table:**
+
+    | Left | Right | Result |
+    |------|-------|--------|
+    | F    | F     | F      |
+    | F    | T     | F      |
+    | T    | F     | F      |
+    | T    | T     | T      |
+
+    **Example usage:** `A*B`, `(A+B)*~C`
+
+    <Note>
+      Use `*` for AND — **not** `&`, `&&`, or `^`. Those characters are not
+      recognised and will throw a runtime error.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Implication  (>)  —  Material Implication">
+    **Source constant:** `OP_IMP = -4`
+
+    **Symbol:** `>`  (greater-than, ASCII 62)
+
+    **Arity:** Binary — infix operator, takes one operand on each side.
+
+    **Semantics:** Models the classical material conditional "if left then right". Returns `false` **only** when the antecedent (left) is `true` and the consequent (right) is `false`. In all other cases — including when the antecedent is `false` (vacuous truth) — it returns `true`.
+
+    **Evaluation (from source):**
+    ```cpp
+    if (curr->data == OP_IMP) return (!left_val) || right_val;
+    ```
+
+    This is the standard logical equivalence `A → B ≡ ¬A ∨ B`.
+
+    **Truth Table:**
+
+    | Left (antecedent) | Right (consequent) | Result |
+    |-------------------|--------------------|--------|
+    | F                 | F                  | T      |
+    | F                 | T                  | T      |
+    | T                 | F                  | **F**  |
+    | T                 | T                  | T      |
+
+    **Example usage:** `A>B`, `(A*B)>C`
+
+    <Note>
+      Use `>` for implication — **not** `->`, `=>`, or `→`. The multi-character
+      sequences `->` and `=>` are not single tokens; the `-` and `=` characters
+      would cause a runtime error before `>` is ever reached.
+    </Note>
+  </Accordion>
+</AccordionGroup>

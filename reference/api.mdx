@@ -1,0 +1,269 @@
+---
+title: "PropositionalTree Class: Full API Reference"
+sidebarTitle: "API Reference"
+description: "Complete reference for the PropositionalTree class: constructors, public methods, their signatures, parameters, return types, and behavior."
+---
+
+`PropositionalTree` is the central class of the Logic Assignment project. It encapsulates the full lifecycle of a propositional formula — from raw string (or DIMACS CNF file) through tokenisation, prefix conversion, binary tree construction, traversal, height computation, and truth table generation. Every public method below corresponds directly to source code in `Assignment.cpp`; no methods are inherited or virtual.
+
+---
+
+## Canonical Usage Sequence
+
+The three-step build pipeline must be respected. Always construct the object, convert to prefix, then build the tree before calling any query or output method:
+
+```cpp
+auto tree = std::make_unique<PropositionalTree>("(A+B)*~C");
+tree->infixToPrefix();
+tree->buildTreeFromPrefix();
+
+tree->printPreOrderRecursive();
+tree->printInOrderRecursive();
+tree->printPostOrderRecursive();
+tree->computeHeightRecursive();
+tree->computeHeightIterative();
+tree->generateTruthTable();
+```
+
+<Warning>
+  `infixToPrefix()` must be called before `buildTreeFromPrefix()`, and
+  `buildTreeFromPrefix()` must be called before any traversal, height, or truth
+  table method. Calling these out of order will operate on a null or stale tree
+  and produce incorrect output (or no output at all).
+</Warning>
+
+---
+
+## Constructors
+
+### Infix string constructor
+
+```cpp
+explicit PropositionalTree(string infix_expr);
+```
+
+Constructs a `PropositionalTree` from a raw infix propositional formula string. The string is moved into the internal `infix` field and then `prepare()` is called immediately, which:
+
+1. **Tokenises** the formula into the `infixTokens` vector, mapping each variable name to a unique non-negative integer ID and each operator/parenthesis to its negative sentinel constant.
+2. **Builds `matchParen`** — a parallel index array where `matchParen[i]` holds the position of the matching closing (or opening) parenthesis for position `i`, enabling O(1) partner lookup during prefix conversion.
+3. **Sets `sep`** — a space separator used when printing tokens; it is set to `" "` if any variable name is longer than one character, otherwise `""`.
+
+If the formula contains unrecognised characters or unbalanced parentheses, `prepare()` throws a `std::runtime_error` which propagates to the caller.
+
+<ParamField path="infix_expr" type="string">
+  The propositional formula in infix notation, e.g. `"(A+B)*~C"`. Spaces are
+  ignored. Valid characters are `a-z`, `A-Z`, `0-9`, `_`, `~`, `+`, `*`, `>`,
+  `(`, `)`, and whitespace.
+</ParamField>
+
+---
+
+### DIMACS CNF file constructor
+
+```cpp
+explicit PropositionalTree(ifstream& file);
+```
+
+Constructs a `PropositionalTree` by reading a DIMACS CNF file from an already-open `ifstream`. Internally calls `parseCNF(file)` first, which converts the clause list into an equivalent left-associative infix formula string (using `+` for OR within clauses and `*` for AND between clauses, with `~` for negation), then calls `prepare()` on the result.
+
+Lines beginning with `c`, `p`, `%`, or empty lines are skipped during parsing. Variables numbered 1–26 are mapped to single uppercase letters (`A`–`Z`); variables beyond 26 are named `x1`, `x2`, … etc.
+
+<ParamField path="file" type="ifstream&">
+  A reference to an open `ifstream` positioned at the start of a DIMACS CNF
+  file. The stream must be valid and readable; no file-open check is performed
+  inside the constructor.
+</ParamField>
+
+---
+
+### Deleted copy constructor and copy assignment
+
+```cpp
+PropositionalTree(const PropositionalTree&) = delete;
+PropositionalTree& operator=(const PropositionalTree&) = delete;
+```
+
+Both copy construction and copy assignment are explicitly deleted. `PropositionalTree` owns raw heap-allocated `Node` objects, and shallow copying would lead to double-free. Use `std::unique_ptr<PropositionalTree>` (as shown in `main()`) rather than copying.
+
+---
+
+## Destructor
+
+```cpp
+~PropositionalTree();
+```
+
+Destroys the tree by calling the private `destroyTree(root)` helper, which performs a post-order recursive traversal and calls `delete` on every `Node`. This ensures that all heap memory allocated during `buildTreeFromPrefix()` is released cleanly. If the tree was never built (i.e. `buildTreeFromPrefix()` was never called), `root` is `nullptr` and `destroyTree` is a no-op.
+
+---
+
+## Build Pipeline
+
+These two methods must be called in order after construction and before any traversal, height, or truth table operation.
+
+### `infixToPrefix()`
+
+```cpp
+void infixToPrefix();
+```
+
+Converts the token sequence in `infixTokens` into a prefix (pre-order) token sequence stored in the `prefix` vector. The conversion is performed by the private recursive helper `processInfix(int l, int r)`, which:
+
+- Strips matching outer parentheses from the current window `[l, r)`.
+- If the window holds a single token, pushes it directly.
+- Otherwise, scans left-to-right for the **first** binary operator at the current nesting level (skipping over parenthesised sub-expressions via `matchParen`). That operator becomes the root of the sub-expression; `processInfix` recurses on the left operand window and the right operand window.
+- If no binary operator is found but the first token is `OP_NOT`, the `~` is pushed and the method recurses on the remainder.
+
+Calling `infixToPrefix()` again after the tree has been built is safe — it clears and rebuilds `prefix` — but you must call `buildTreeFromPrefix()` again afterwards to sync the tree.
+
+---
+
+### `buildTreeFromPrefix()`
+
+```cpp
+void buildTreeFromPrefix();
+```
+
+Destroys any existing tree (via `destroyTree(root)`) and then reconstructs it from the current `prefix` vector by calling the private `buildTree(prefix, 0)` helper. `buildTree` consumes tokens from `prefix` left-to-right:
+
+- For a binary operator (`OP_OR`, `OP_AND`, `OP_IMP`): creates a node, then recursively builds and attaches both a left and a right child.
+- For `OP_NOT`: creates a node and recursively builds only a left child.
+- For a variable ID (non-negative): creates and returns a leaf node immediately.
+
+After this call, `root` points to the fully constructed tree and all traversal/height/truth-table methods are ready.
+
+---
+
+## Query Methods
+
+### `empty()`
+
+```cpp
+[[nodiscard]] bool empty() const;
+```
+
+Returns `true` if the `infixTokens` vector is empty, meaning the formula string (or CNF file) resolved to an empty formula after tokenisation. Used in `main()` to guard against operating on a vacuous tree.
+
+<ResponseField name="return" type="bool">
+  `true` if no tokens were produced during `prepare()`, `false` otherwise.
+</ResponseField>
+
+---
+
+### `countNodes()`
+
+```cpp
+[[nodiscard]] int countNodes() const;
+```
+
+Returns the total number of `Node` objects currently in the tree using an iterative stack-based traversal (pre-order stack walk). Returns `0` if `root` is `nullptr` (i.e. the tree has not been built yet).
+
+In `main()`, the result is compared against the hard-coded threshold `LARGE_TREE_NODES = 300` to decide whether to suppress traversal output.
+
+<ResponseField name="return" type="int">
+  Total node count, or `0` if the tree has not been built.
+</ResponseField>
+
+---
+
+## Traversal Methods
+
+All six traversal methods print their output to `stdout` and append a single `'\n'` at the end. For pre-order and post-order output, variable-length names are separated by `sep` (a single space when any variable name exceeds one character; empty otherwise). In-order output always parenthesises sub-expressions and inserts spaces around binary operators regardless of `sep`.
+
+<Warning>
+  These methods silently produce no meaningful output if `buildTreeFromPrefix()`
+  has not been called, because `root` will be `nullptr`.
+</Warning>
+
+### Pre-order traversals
+
+```cpp
+void printPreOrderRecursive();
+void printPreOrderIterative();
+```
+
+Both print the formula in **prefix notation**: root first, then left subtree, then right subtree. Operator nodes are printed via `label()` which returns the character for operators (`~`, `+`, `*`, `>`) and the variable name for leaf nodes.
+
+`printPreOrderRecursive()` uses the private `preOrderRec(Node*)` helper.
+`printPreOrderIterative()` uses a parent-tracking stack that simulates the same traversal order without function-call recursion.
+
+---
+
+### In-order traversals
+
+```cpp
+void printInOrderRecursive();
+void printInOrderIterative();
+```
+
+Both print the formula in **infix notation** with full parenthesisation: each operator sub-expression is wrapped in `( … )`, unary `~` is placed immediately after the opening parenthesis, and binary operators are flanked by spaces: `(left op right)`.
+
+`printInOrderRecursive()` uses the private `inOrderRec(Node*)` helper.
+`printInOrderIterative()` uses a parent-tracking stack to emit parentheses and operators at the correct points without recursion.
+
+---
+
+### Post-order traversals
+
+```cpp
+void printPostOrderRecursive();
+void printPostOrderIterative();
+```
+
+Both print the formula in **postfix notation**: left subtree, then right subtree, then root. Output format matches pre-order (operator characters and variable names separated by `sep`).
+
+`printPostOrderRecursive()` uses the private `postOrderRec(Node*)` helper.
+`printPostOrderIterative()` uses a parent-tracking stack to emit each node only after both its children have been visited.
+
+---
+
+## Height Methods
+
+### `computeHeightRecursive()`
+
+```cpp
+int computeHeightRecursive();
+```
+
+Computes the height of the tree (number of nodes on the longest root-to-leaf path) using the private recursive `heightRec(Node*)` helper. Each call returns `1 + max(height(left), height(right))`, with the base case returning `0` for a `nullptr` node. A single-node tree has height 1.
+
+<ResponseField name="return" type="int">
+  Tree height; `0` if the tree is empty (root is `nullptr`).
+</ResponseField>
+
+---
+
+### `computeHeightIterative()`
+
+```cpp
+int computeHeightIterative();
+```
+
+Computes the same height value using BFS level-order traversal. A `std::queue` is seeded with `root`, and `height` is incremented for each fully processed level. Returns `0` immediately if `root` is `nullptr`.
+
+<ResponseField name="return" type="int">
+  Tree height; `0` if the tree is empty (root is `nullptr`).
+</ResponseField>
+
+---
+
+## Truth Table
+
+### `generateTruthTable()`
+
+```cpp
+void generateTruthTable();
+```
+
+Prints a complete truth table for the formula to `stdout`. The process is:
+
+1. **Variable collection**: `populateVars()` performs a full recursive tree walk to collect the set of distinct variable IDs present in the tree's leaf nodes.
+2. **Sorting**: variables are sorted alphabetically by their string name so the column order is deterministic.
+3. **Variable limit check**: if the number of distinct variables `n` exceeds `MAX_TRUTH_TABLE_VARS` (16), the method prints a skip message and returns early — see [Limitations](/reference/limitations) for the exact message format.
+4. **Header**: prints a `Name | Result` header row followed by a dashed separator line.
+5. **Row enumeration**: iterates over all `2^n` possible truth assignments (from `0` to `2^n - 1`), decodes each integer into a `T`/`F` assignment for each variable (MSB = first variable), calls `evaluateRec(root, truthValues)` to evaluate the formula, and prints `T` or `F` for each variable followed by the result.
+
+<ResponseField name="return" type="void">
+  No return value. Output goes entirely to `stdout`. If `root` is `nullptr` the
+  method returns immediately without printing anything.
+</ResponseField>

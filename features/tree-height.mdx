@@ -1,0 +1,126 @@
+---
+title: "Computing Tree Height: Recursive and Iterative Methods"
+sidebarTitle: "Tree Height"
+description: "Logic Assignment computes the height of the propositional expression tree using both a recursive DFS approach and an iterative BFS approach, printing both results."
+---
+
+The height of the expression tree is a direct measure of how deeply nested a propositional formula is. Logic Assignment computes this value twice — once with a classic recursive depth-first search and once with an iterative breadth-first search — and prints both results side by side. The two answers are always equal for any well-formed tree, making the pair a useful sanity-check for the tree-building step as well as a concrete illustration of two fundamentally different algorithmic strategies applied to the same problem.
+
+## Definition of height
+
+Height is defined as the number of **nodes** on the longest path from the root down to a leaf. The recursive implementation makes this precise:
+
+```cpp
+int heightRec(Node* curr) {
+    if (!curr) return 0;
+    return 1 + max(heightRec(curr->left), heightRec(curr->right));
+}
+```
+
+- A `nullptr` (empty subtree) has height **0**.
+- Any single leaf node has height **1** (the `1 +` applied to two zero children).
+- An internal node adds **1** to the maximum height of its two children.
+
+This means height counts **levels**, where the root alone occupies level 1 and each additional layer of operators or operands adds 1.
+
+| Formula | Tree structure | Height |
+|---|---|---|
+| `A` | Single leaf | 1 |
+| `~A` | NOT → A | 2 |
+| `~~A` | NOT → NOT → A | 3 |
+| `(A+B)*~C` | Three levels deep | 3 |
+
+---
+
+## `computeHeightRecursive()`
+
+`computeHeightRecursive()` is a thin public wrapper that calls the private `heightRec(root)`:
+
+```cpp
+int computeHeightRecursive() {
+    return heightRec(root);
+}
+```
+
+`heightRec` performs a **post-order DFS**: it descends fully into both subtrees before computing the current node's height from the returned values. The C++ call stack implicitly manages the traversal state, so the code is concise and maps directly onto the mathematical definition of tree height.
+
+Because each node is visited exactly once, the time complexity is **O(n)** and the space complexity is **O(h)** (proportional to the height, due to the call stack frames).
+
+---
+
+## `computeHeightIterative()`
+
+`computeHeightIterative()` replaces the recursive call stack with an explicit **BFS queue**, processing the tree level by level:
+
+```cpp
+int computeHeightIterative() {
+    if (!root) return 0;
+
+    queue<Node*> q;
+    q.push(root);
+    int height = 0;
+
+    while (!q.empty()) {
+        int level_size = q.size();
+        height++;
+
+        for (int i = 0; i < level_size; i++) {
+            Node* curr = q.front();
+            q.pop();
+
+            if (curr->left)  q.push(curr->left);
+            if (curr->right) q.push(curr->right);
+        }
+    }
+    return height;
+}
+```
+
+**How it works:**
+1. The root is enqueued and `height` starts at 0.
+2. Each iteration of the outer `while` loop processes one complete level. The snapshot `level_size = q.size()` freezes the number of nodes at the current level before any children are added.
+3. Every node at the current level is dequeued, its children are enqueued for the next level, and `height` is incremented once per level — not once per node.
+4. When the queue empties, `height` equals the number of levels traversed, which is the tree height.
+
+The time complexity is the same **O(n)**, but the space complexity is **O(w)** where *w* is the maximum width (number of nodes at the widest level) rather than the depth.
+
+<Tip>
+The iterative BFS method is especially valuable for very **deep or heavily nested formulas**. A deeply recursive formula can push thousands of frames onto the C++ call stack, potentially causing a **stack overflow** at runtime. The BFS approach uses heap-allocated queue memory instead, so it scales to arbitrary depth without hitting the OS stack limit.
+</Tip>
+
+---
+
+## Example output
+
+For the formula `(A+B)*~C`, which has three levels (root `*`, children `+` and `~`, leaves `A`, `B`, `C`):
+
+```
+--- Tree Height ---
+Height (Recursive)     : 3
+Height (Iterative)     : 3
+```
+
+Both methods agree: the longest root-to-leaf path passes through three nodes.
+
+---
+
+## Height and formula complexity
+
+Tree height grows with the **nesting depth** of a formula, not with the number of unique variables. A single deeply chained unary operator produces the tallest possible tree for its node count:
+
+```
+Formula        Height   Notes
+──────────────────────────────────────
+A                 1     Single variable, no operators
+~A                2     One NOT adds one level
+~~A               3     Two NOTs add two levels
+~~~A              4     Chaining continues indefinitely
+A+B               2     One binary operator one level above two leaves
+(A+B)*C           3     Nesting adds one more level
+(A+B)*(C+D)       3     Wider, but not deeper than one level of nesting
+((A+B)*C)>D       4     Each nesting layer adds one level
+```
+
+A formula with only flat conjunctions of literals (e.g. a single CNF clause) stays shallow regardless of how many variables it contains, while a right-skewed chain of implications produces a tree whose height equals the number of operators.
+
+Height therefore gives a quick estimate of the **recursion depth** any tree-walking algorithm will reach, which makes it a practical diagnostic metric alongside the node count.

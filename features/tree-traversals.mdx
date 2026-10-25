@@ -1,0 +1,154 @@
+---
+title: "Tree Traversals: Pre-order, In-order, and Post-order"
+sidebarTitle: "Tree Traversals"
+description: "Logic Assignment prints every tree traversal order in both recursive and iterative form, letting you verify the parser and inspect the formula structure."
+---
+
+Once the parser converts your propositional formula into a binary expression tree, Logic Assignment can walk that tree in six distinct ways — three classical orderings (pre-order, in-order, post-order), each available in both a recursive and an iterative implementation. Comparing the two implementations for the same ordering always produces identical output, so the pair serves as a built-in correctness check while also giving you a clear view of how operators and operands are structured throughout the formula.
+
+## The six traversal methods
+
+| Method | Function |
+|---|---|
+| Pre-Order (Recursive) | `printPreOrderRecursive()` |
+| Pre-Order (Iterative) | `printPreOrderIterative()` |
+| In-Order (Recursive) | `printInOrderRecursive()` |
+| In-Order (Iterative) | `printInOrderIterative()` |
+| Post-Order (Recursive) | `printPostOrderRecursive()` |
+| Post-Order (Iterative) | `printPostOrderIterative()` |
+
+All six methods are called automatically from `main()` after the tree is built, and their output is printed under the `--- Tree Traversals ---` section.
+
+<Note>
+For trees with more than **300 nodes** (`LARGE_TREE_NODES` constant in `main()`), all six traversal outputs are skipped entirely and the following message is printed instead:
+
+```
+Tree is large (N nodes). Skipping full traversal display.
+```
+
+The node count is still displayed before the skip message. Height computation and truth-table generation continue normally.
+</Note>
+
+---
+
+## Recursive vs. iterative implementations
+
+The **recursive** methods (`preOrderRec`, `inOrderRec`, `postOrderRec`) rely on C++'s own call stack. Each function calls itself on the left and right children, and the OS stack frame tracks where to return. This is the classical textbook approach and is easy to follow.
+
+The **iterative** methods replace the implicit call stack with an explicit `stack<Node*>` and a `prev` pointer. The `prev` pointer records which node was visited last, allowing the traversal to determine its current state — whether it is descending into the left subtree, crossing to the right subtree, or ascending back to a parent — without any recursive calls. A sentinel `nullptr` is pushed onto the bottom of the stack so that ascending past the root cleanly terminates the loop.
+
+---
+
+## Traversal types
+
+<Tabs>
+  <Tab title="Pre-order">
+    ### Pre-order traversal (root → left → right)
+
+    Pre-order visits the current node **before** either of its children. Because every operator is printed before its operands, the result is standard **prefix notation** (also called Polish notation). This is in fact the same representation that the internal parser uses: `infixToPrefix()` converts the infix formula to prefix form before `buildTreeFromPrefix()` constructs the tree.
+
+    #### Visit order
+    1. Print the current node.
+    2. Recurse / iterate into the **left** subtree.
+    3. Recurse / iterate into the **right** subtree.
+
+    For unary NOT, only the left child exists, so step 3 is skipped.
+
+    #### Example — `(A+B)*~C`
+
+    ```
+    Pre-Order (Recursive) : * + A B ~ C
+    Pre-Order (Iterative) : * + A B ~ C
+    ```
+
+    Reading left-to-right: `*` is the root (AND), `+` is the left child (OR) with operands `A` and `B`, `~` is the NOT operator applied to `C`.
+
+    #### Iterative mechanics
+    `printPreOrderIterative()` prints a node's label the **first** time it is encountered (before descending). The `prev` pointer distinguishes a fresh descent from a return visit, ensuring no node is printed twice.
+  </Tab>
+
+  <Tab title="In-order">
+    ### In-order traversal (left → root → right)
+
+    In-order visits the **left** child first, then the current node, then the **right** child. For a binary expression tree this re-parenthesises the formula, making the operator precedence fully explicit. Logic Assignment's `inOrderRec` / `printInOrderIterative` wrap every sub-expression in parentheses, so the output is an unambiguous, fully-bracketed infix string.
+
+    #### Parenthesisation rules (from `inOrderRec`)
+    - **Leaf node** — printed as-is (no parentheses).
+    - **Binary operator** — printed as `(left_subtree op right_subtree)`.
+    - **Unary NOT** — printed as `(~operand)`. Because NOT has no right child, the iterative implementation detects `OP_NOT` and inserts `~` immediately after the opening `(`.
+
+    #### Example — `(A+B)*~C`
+
+    ```
+    In-Order (Recursive)  : ((A + B) * (~C))
+    In-Order (Iterative)  : ((A + B) * (~C))
+    ```
+
+    Every operator is surrounded by its fully-bracketed sub-expressions, eliminating any ambiguity about evaluation order.
+
+    #### Iterative mechanics
+    `printInOrderIterative()` uses the `prev` pointer to detect three states:
+    - **First visit** — print `(` (and `~` for NOT), push the node, descend left.
+    - **Returning from left** — print ` op ` (for binary nodes), then descend right.
+    - **Returning from right** — print `)`, pop, ascend.
+  </Tab>
+
+  <Tab title="Post-order">
+    ### Post-order traversal (left → right → root)
+
+    Post-order visits both children **before** the current node. Because every operator is printed after all its operands, the result is **reverse Polish notation** (postfix notation) — the form used by stack-based virtual machines and some calculators.
+
+    #### Visit order
+    1. Recurse / iterate into the **left** subtree.
+    2. Recurse / iterate into the **right** subtree (skipped for NOT).
+    3. Print the current node.
+
+    #### Example — `(A+B)*~C`
+
+    ```
+    Post-Order (Recursive): A B + C ~ *
+    Post-Order (Iterative): A B + C ~ *
+    ```
+
+    Reading left-to-right: operands `A` and `B` come first, then their operator `+`; operand `C` follows with its `~`; finally the root `*` applies to the two sub-results.
+
+    #### Iterative mechanics
+    `printPostOrderIterative()` prints a node's label only when **returning** from its subtree (i.e. when `prev` equals the right child, or equals the left child for NOT). This mirrors what the recursive version achieves naturally through the position of the `cout` statement after both recursive calls.
+  </Tab>
+</Tabs>
+
+---
+
+## Token separator (`sep`)
+
+During parsing, `prepare()` scans every variable name and sets:
+
+```cpp
+sep = "";
+for (const string& n : names) if (n.size() > 1) sep = " ";
+```
+
+- When **all** variable names are a single character (e.g. `A`, `B`, `C`), `sep` is an empty string and tokens in prefix/postfix output are printed adjacently (e.g. `*+AB~C`).
+- When **any** variable name is longer than one character (e.g. `p1`, `out`), `sep` becomes a single space and every token is separated (e.g. `* + p1 p2 ~ out`).
+
+This keeps single-character output compact while preventing multi-character names from merging into unreadable strings. The separator is used by all prefix and postfix traversals; in-order output is unaffected because parentheses and spaces are inserted explicitly by `inOrderRec`.
+
+---
+
+## Full example output
+
+For the formula `(A+B)*~C`, a complete run of the traversal section looks like this:
+
+```
+--- Tree Traversals ---
+Nodes in tree          : 6
+
+Pre-Order (Recursive) : * + A B ~ C
+Pre-Order (Iterative) : * + A B ~ C
+In-Order (Recursive)  : ((A + B) * (~C))
+In-Order (Iterative)  : ((A + B) * (~C))
+Post-Order (Recursive): A B + C ~ *
+Post-Order (Iterative): A B + C ~ *
+```
+
+The recursive and iterative outputs always match, confirming that both implementations traverse the same tree correctly.
