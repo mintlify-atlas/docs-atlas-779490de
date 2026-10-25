@@ -1,5 +1,5 @@
 ---
-title: "PropositionalTree Class: Full API Reference"
+title: "PropositionalTree C++ Class: Complete Public API Reference"
 sidebarTitle: "API Reference"
 description: "Complete reference for the PropositionalTree class: constructors, public methods, their signatures, parameters, return types, and behavior."
 ---
@@ -17,9 +17,18 @@ auto tree = std::make_unique<PropositionalTree>("(A+B)*~C");
 tree->infixToPrefix();
 tree->buildTreeFromPrefix();
 
-tree->printPreOrderRecursive();
-tree->printInOrderRecursive();
-tree->printPostOrderRecursive();
+constexpr int LARGE_TREE_NODES = 300;
+int nodeCount = tree->countNodes();
+
+if (nodeCount <= LARGE_TREE_NODES) {
+    tree->printPreOrderRecursive();
+    tree->printPreOrderIterative();
+    tree->printInOrderRecursive();
+    tree->printInOrderIterative();
+    tree->printPostOrderRecursive();
+    tree->printPostOrderIterative();
+}
+
 tree->computeHeightRecursive();
 tree->computeHeightIterative();
 tree->generateTruthTable();

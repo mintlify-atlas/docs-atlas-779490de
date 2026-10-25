@@ -106,20 +106,20 @@ Variable names `p1`, `p2`, `q`, and `r` are each lexed as a single token. The ma
 ## Error Conditions
 
 <Warning>
-  **Unbalanced parentheses** cause the program to throw a runtime error immediately during the lexing phase and abort:
+  **Unbalanced parentheses** cause the program to abort immediately during the lexing phase and print:
 
-  ```
-  runtime_error: unbalanced parentheses in formula
+  ```text
+  Error: unbalanced parentheses in formula
   ```
 
   This is raised both when a closing `)` is encountered with no matching `(` on the stack, and when the stack is non-empty after all tokens have been processed (i.e. one or more `(` were never closed).
 </Warning>
 
 <Warning>
-  **Unexpected characters** — any character that is not whitespace, a recognised operator symbol, a parenthesis, or an alphanumeric/underscore character — cause the program to throw a runtime error identifying the offending character:
+  **Unexpected characters** — any character that is not whitespace, a recognised operator symbol, a parenthesis, or an alphanumeric/underscore character — cause the program to abort and identify the offending character:
 
-  ```
-  runtime_error: unexpected character '<char>' in formula
+  ```text
+  Error: unexpected character '<char>' in formula
   ```
 
   Common mistakes include using `&` or `|` instead of `*` and `+`, or pasting a formula that contains Unicode quotation marks.

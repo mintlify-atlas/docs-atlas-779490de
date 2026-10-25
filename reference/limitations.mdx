@@ -1,5 +1,5 @@
 ---
-title: "Known Limitations and Edge Cases"
+title: "Logic Assignment: Known Limitations and Edge Cases"
 sidebarTitle: "Limitations"
 description: "Understand the constraints and known edge cases in Logic Assignment: variable limits, large tree behaviour, error handling, and parser assumptions."
 ---
@@ -18,7 +18,7 @@ Logic Assignment is a focused educational tool, and its source code makes severa
   This means `A+B*C` is parsed as `(A+B)*C` (OR is the main operator because it appears first), not `A+(B*C)` as classical precedence would dictate.
 
   **Always use explicit parentheses** to make grouping unambiguous:
-  ```
+  ```text
   A+(B*C)   -- correct: AND binds tighter
   (A+B)*C   -- also valid, but different meaning
   ```
@@ -32,7 +32,7 @@ Logic Assignment is a focused educational tool, and its source code makes severa
 
   `generateTruthTable()` will not print a truth table for formulas that contain more than 16 distinct propositional variables. When the limit is exceeded, the following message is printed to `stdout` and the method returns early:
 
-  ```
+  ```text
   Formula has N variables, so its truth table would have 2^N rows.
   Skipping (limit is 16 variables).
   ```
@@ -47,7 +47,7 @@ Logic Assignment is a focused educational tool, and its source code makes severa
 
   When `countNodes()` returns more than 300, all six traversal methods (`printPreOrderRecursive`, `printPreOrderIterative`, `printInOrderRecursive`, `printInOrderIterative`, `printPostOrderRecursive`, `printPostOrderIterative`) are **skipped** in `main()` and the following message is printed instead:
 
-  ```
+  ```text
   Tree is large (N nodes). Skipping full traversal display .
   ```
 

@@ -1,5 +1,5 @@
 ---
-title: "Get Started with Logic Assignment"
+title: "Build and Run Logic Assignment: C++ Quickstart Guide"
 sidebarTitle: "Quickstart"
 description: "Compile the C++ source, run the program with an infix formula or a DIMACS CNF file, and read traversal and truth table output in under five minutes."
 ---
@@ -73,14 +73,14 @@ description: "Compile the C++ source, run the program with an infix formula or a
 
     ```text
     --- Tree Traversals ---
-    Nodes in tree          : 5
+    Nodes in tree          : 6
 
-    Pre-Order (Recursive) : * + A B ~ C
-    Pre-Order (Iterative) : * + A B ~ C
+    Pre-Order (Recursive) : *+AB~C
+    Pre-Order (Iterative) : *+AB~C
     In-Order (Recursive)  : ((A + B) * (~C))
     In-Order (Iterative)  : ((A + B) * (~C))
-    Post-Order (Recursive): A B + C ~ *
-    Post-Order (Iterative): A B + C ~ *
+    Post-Order (Recursive): AB+C~*
+    Post-Order (Iterative): AB+C~*
 
     --- Tree Height ---
     Height (Recursive)     : 3
@@ -134,9 +134,9 @@ description: "Compile the C++ source, run the program with an infix formula or a
 | Section | What it shows |
 |---------|--------------|
 | **Nodes in tree** | Total node count after the tree is built. |
-| **Pre-Order** | Root → left → right (prefix notation, space-separated). |
+| **Pre-Order** | Root → left → right (prefix notation; tokens separated by spaces when multi-character variable names are present). |
 | **In-Order** | Fully parenthesised infix expression. |
-| **Post-Order** | Left → right → root (postfix / RPN notation). |
+| **Post-Order** | Left → right → root (postfix / RPN notation; same spacing rule as pre-order). |
 | **Height** | Longest root-to-leaf path measured in edges + 1 (node count). |
 | **Truth Table** | One row per variable assignment; columns for each variable then `Result`. |
 

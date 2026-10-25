@@ -1,7 +1,7 @@
 ---
-title: "Loading Formulas from DIMACS CNF Files"
+title: "Loading Propositional Formulas from DIMACS CNF Files"
 sidebarTitle: "DIMACS CNF"
-description: "Load propositional formulas in standard DIMACS CNF format into Logic Assignment instead of typing them manually as infix strings."
+description: "Load propositional formulas in standard DIMACS CNF format into Logic Assignment instead of entering them manually as infix formula strings."
 ---
 
 Logic Assignment does not require you to hand-write an infix formula. As an alternative input path, the program can read a file in **DIMACS CNF format** — the plain-text standard used by virtually every SAT solver and benchmark library — and automatically convert it into the internal infix representation before building the expression tree. This makes it straightforward to explore real-world SAT instances without transcribing them by hand.
@@ -16,6 +16,7 @@ A DIMACS CNF file is a plain-text file. The `parseCNF` method processes it line 
 
 | Line type                              | How it is handled                        |
 |----------------------------------------|------------------------------------------|
+| Empty line                             | Skipped entirely                         |
 | Starts with `c`                        | Comment — skipped entirely               |
 | Starts with `p`                        | Problem header — skipped entirely        |
 | Starts with `%`                        | End-of-file marker — skipped entirely    |
@@ -56,13 +57,13 @@ The full formula is the conjunction of both clauses: `(A + ~B) * (~A + C)`.
 
 1. **Inside each clause**, literals are folded left-to-right with `+` (OR):
 
-   ```
+   ```text
    first literal:          atom
    second literal onward:  (prev_clause + atom)
    ```
 
    So a clause `[1, -2, 3]` (with `maxVar ≤ 26`) becomes:
-   ```
+   ```text
    A          ← literal 1
    (A+~B)     ← add literal -2
    ((A+~B)+C) ← add literal 3
@@ -70,7 +71,7 @@ The full formula is the conjunction of both clauses: `(A + ~B) * (~A + C)`.
 
 2. **Across clauses**, clauses are folded left-to-right with `*` (AND):
 
-   ```
+   ```text
    first clause:           clause_str
    second clause onward:   (prev_formula * clause_str)
    ```
@@ -79,7 +80,7 @@ The full formula is the conjunction of both clauses: `(A + ~B) * (~A + C)`.
 
 Applying this to the sample file above:
 
-```
+```text
 Clause 1:  (A+~B)
 Clause 2:  (~A+C)
 Formula:   ((A+~B)*(~A+C))
@@ -99,7 +100,7 @@ Run the compiled program, press **Enter** at the Method 1 prompt to skip manual 
 ./logic
 ```
 
-```
+```text
 METHOD 1: Enter an infix formula (or press ENTER to skip): ↵
 METHOD 2: Enter the path to the DIMACS .cnf file: /path/to/problem.cnf
 ```
@@ -113,7 +114,7 @@ The program strips leading/trailing whitespace and quotation marks from the path
 <Warning>
   The file is opened with a standard `ifstream`. If the path cannot be opened — because the file does not exist, the path is misspelled, or permissions are insufficient — the program prints an error message and exits with a non-zero status code:
 
-  ```
+  ```text
   Error: Could not open file.
   ```
 

@@ -23,7 +23,7 @@ All six methods are called automatically from `main()` after the tree is built, 
 For trees with more than **300 nodes** (`LARGE_TREE_NODES` constant in `main()`), all six traversal outputs are skipped entirely and the following message is printed instead:
 
 ```
-Tree is large (N nodes). Skipping full traversal display.
+Tree is large (N nodes). Skipping full traversal display .
 ```
 
 The node count is still displayed before the skip message. Height computation and truth-table generation continue normally.
@@ -57,11 +57,11 @@ The **iterative** methods replace the implicit call stack with an explicit `stac
     #### Example — `(A+B)*~C`
 
     ```
-    Pre-Order (Recursive) : * + A B ~ C
-    Pre-Order (Iterative) : * + A B ~ C
+    Pre-Order (Recursive) : *+AB~C
+    Pre-Order (Iterative) : *+AB~C
     ```
 
-    Reading left-to-right: `*` is the root (AND), `+` is the left child (OR) with operands `A` and `B`, `~` is the NOT operator applied to `C`.
+    Reading left-to-right: `*` is the root (AND), `+` is the left child (OR) with operands `A` and `B`, `~` is the NOT operator applied to `C`. Because all variable names are single characters, `sep` is the empty string and tokens are printed adjacently with no spaces between them.
 
     #### Iterative mechanics
     `printPreOrderIterative()` prints a node's label the **first** time it is encountered (before descending). The `prev` pointer distinguishes a fresh descent from a return visit, ensuring no node is printed twice.
@@ -106,11 +106,11 @@ The **iterative** methods replace the implicit call stack with an explicit `stac
     #### Example — `(A+B)*~C`
 
     ```
-    Post-Order (Recursive): A B + C ~ *
-    Post-Order (Iterative): A B + C ~ *
+    Post-Order (Recursive): AB+C~*
+    Post-Order (Iterative): AB+C~*
     ```
 
-    Reading left-to-right: operands `A` and `B` come first, then their operator `+`; operand `C` follows with its `~`; finally the root `*` applies to the two sub-results.
+    Reading left-to-right: operands `A` and `B` come first, then their operator `+`; operand `C` follows with its `~`; finally the root `*` applies to the two sub-results. All variable names are single characters so `sep` is the empty string and tokens appear adjacent with no spaces.
 
     #### Iterative mechanics
     `printPostOrderIterative()` prints a node's label only when **returning** from its subtree (i.e. when `prev` equals the right child, or equals the left child for NOT). This mirrors what the recursive version achieves naturally through the position of the `cout` statement after both recursive calls.
@@ -143,12 +143,12 @@ For the formula `(A+B)*~C`, a complete run of the traversal section looks like t
 --- Tree Traversals ---
 Nodes in tree          : 6
 
-Pre-Order (Recursive) : * + A B ~ C
-Pre-Order (Iterative) : * + A B ~ C
+Pre-Order (Recursive) : *+AB~C
+Pre-Order (Iterative) : *+AB~C
 In-Order (Recursive)  : ((A + B) * (~C))
 In-Order (Iterative)  : ((A + B) * (~C))
-Post-Order (Recursive): A B + C ~ *
-Post-Order (Iterative): A B + C ~ *
+Post-Order (Recursive): AB+C~*
+Post-Order (Iterative): AB+C~*
 ```
 
 The recursive and iterative outputs always match, confirming that both implementations traverse the same tree correctly.

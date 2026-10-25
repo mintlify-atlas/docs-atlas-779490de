@@ -71,7 +71,7 @@ Building the tree is a three-stage pipeline:
 
 ## ASCII Diagram: `(A+B)*~C`
 
-```
+```text
          *          ← AND (binary): left = (+), right = (~)
         / \
        +   ~        ← OR (binary): left = A, right = B
@@ -83,7 +83,7 @@ Note that `~` has **only a left child** (`C`). The right pointer of the `~` node
 
 For comparison, here is an annotated node-by-node layout:
 
-```
+```text
 Node  data     left        right
 ----  ------   ---------   ---------
 n1    OP_AND   → n2 (+)    → n3 (~)
@@ -98,8 +98,8 @@ n6    id(C)    nullptr     nullptr
 
 After the tree is built, `main()` counts the total number of nodes with `countNodes()` and stores the result in `nodeCount`. If `nodeCount` exceeds the constant `LARGE_TREE_NODES = 300`, all traversal output (pre-order, in-order, post-order — both recursive and iterative variants) is skipped and replaced with a single informational message:
 
-```
-Tree is large (N nodes). Skipping full traversal display.
+```text
+Tree is large (N nodes). Skipping full traversal display .
 ```
 
 Height computation and the truth table are **not** suppressed — only the traversal printout is omitted to avoid flooding the terminal with thousands of tokens.
